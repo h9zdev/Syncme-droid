@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.*
 import android.content.*
+import android.content.pm.ServiceInfo
 import android.content.pm.PackageManager
 import android.hardware.camera2.*
 import android.location.*
@@ -35,7 +36,7 @@ class SyncMEService : Service() {
     private var SERVER    = ""
     private var TOKEN     = ""
     private var NAME      = Build.MODEL
-    private var DEVICE_ID = "android-${Build.SERIAL.take(8)}"
+    private var DEVICE_ID = ""
     private val POLL      = 5000L
 
     private val http = OkHttpClient.Builder()
@@ -55,12 +56,34 @@ class SyncMEService : Service() {
         mkChannel()
     }
 
+    @SuppressLint("HardwareIds")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         SERVER    = intent?.getStringExtra("server") ?: SERVER
         TOKEN     = intent?.getStringExtra("token")  ?: TOKEN
         NAME      = intent?.getStringExtra("name")   ?: NAME
-        DEVICE_ID = "android-${Build.SERIAL.take(8)}"
-        startForeground(NID, notif("Connected to $SERVER"))
+        DEVICE_ID = "android-${Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID).take(8)}"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            val finalType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                type or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            } else type
+
+            try {
+                startForeground(NID, notif("Connected to $SERVER"), finalType)
+            } catch (e: Exception) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && e is ForegroundServiceStartNotAllowedException) {
+                    log("Foreground service start not allowed: ${e.message}")
+                } else {
+                    startForeground(NID, notif("Connected to $SERVER"))
+                }
+            }
+        } else {
+            startForeground(NID, notif("Connected to $SERVER"))
+        }
+
         running = true
         scope.launch { register() }
         scope.launch { heartbeat() }
