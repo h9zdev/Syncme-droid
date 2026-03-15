@@ -20,6 +20,12 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      - name: Download gradle-wrapper.jar
+        run: |
+          mkdir -p gradle/wrapper
+          curl -fsSL "https://github.com/nicktindall/cyclon.p2p/raw/master/gradle/wrapper/gradle-wrapper.jar" \
+            -o gradle/wrapper/gradle-wrapper.jar
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
